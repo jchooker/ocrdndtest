@@ -70,18 +70,26 @@ class DragDropApp:
         lf_width = self.left_frame.winfo_width()
 
         self.lf_lbl = tk.Label(self.left_frame, text=DEFAULT_LF_LBL_TEXT, bg="lightsteelblue1", wraplength=lf_width, justify="left", font=jetbrains_font2)
+        #^^making this one the "overlay" label, with both text and image during drag actions
         self.lf_lbl.place(relx=0.5, rely=0.5, anchor="center")
         #update wraplength for label in left frame if it becomes necessary
         self.left_frame.bind("<Configure>", self.update_wraplength)
 
         self.rf_lbl = tk.Label(self.right_frame, bg="steelblue1", fg="white", text="Test text content", font=jetbrains_font1)
         self.rf_lbl.place(anchor="nw", x=10, y=10)
+        #^^removing "overlay_label" and making image and text both appear here
     
     def update_wraplength(self, event):
         new_width = event.width - 20
         self.lf_lbl.config(wraplength=new_width)
 
-    def create_overlay(self, is_valid: bool) -> None:
+    def handle_overlay(self, is_valid: bool) -> None:
+        # if self.lf_lbl is not None:
+        #     return
+        self.overlay_controller(is_valid)
+
+    def overlay_controller(self, is_valid: bool) -> None:
+        print("overlay_controller method init")
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
         check_loc = os.path.join(BASE_DIR, "assets", "green-check.png")
         x_loc = os.path.join(BASE_DIR, "assets", "red-x.png")
@@ -93,53 +101,47 @@ class DragDropApp:
                 which_causing_err = check_loc if not os.path.exists(check_loc) else x_loc
                 print(f"Path \'{which_causing_err}\' not found!")
         image = None
+        new_text = None
         if is_valid:
             image=Image.open(check_loc).convert("RGBA")
-            self.lf_lbl.config(text="Valid image type")
+            new_text="Valid image type"
         else:
             image=Image.open(x_loc).convert("RGBA")
-            self.lf_lbl.config(text="Please provide a valid image type! (PNG, JPG, etc)")
-        #get original image size for maintaining aspect ratio if desired:
+            new_text="Please provide a valid image type! (PNG, JPG, etc)"
         orig_width, orig_height = image.size
         aspect_ratio = orig_height / orig_width
         new_width = self.left_frame.winfo_width() - 10
         new_height = int(new_width * aspect_ratio)
         image = image.resize((new_width, new_height), Image.LANCZOS)
-
         #opacity / transparency / alpha adjustment
         r,g,b,alpha = image.split() #Extract channels (R,G,B,A)
         new_alpha = alpha.point(lambda p: int(p * 0.5)) #transparency layer preserving opacity
         #^^0.5 to reduce opacity to half
         image.putalpha(new_alpha)
-        #alpha_layer = Image.new("L", image.size, IMG_ALPHA) #'L'=grayscale alpha layer
 
         self.overlay_img = ImageTk.PhotoImage(image)
 
-        #set up overlay label to add image to
-        self.overlay_label = tk.Label(self.left_frame, image=self.overlay_img, bg="lightsteelblue1")
-        self.overlay_label.place(relx=0.5, rely=0.5, anchor="center")
-        self.overlay_label.lower() #move below other elements
+        self.lf_lbl.config(image=self.overlay_img, text=new_text, compound="top")
+        print("image overlay changed")
 
-    def destroy_overlay(self):
-        if self.overlay_label:
-            self.overlay_label.destroy()
-            self.overlay_label = None
-            self.lf_lbl.config(text=DEFAULT_LF_LBL_TEXT)
+    def remove_image_overlay(self):
+        if self.lf_lbl:
+            self.lf_lbl.config(image="", text=DEFAULT_LF_LBL_TEXT)
             print("Overlay destroyed.")
 
     def on_drag_enter(self, event) -> None:
         file_path = event.data #get file name?
 
         if check_file_type(file_path):
-            self.create_overlay(True)
+            self.handle_overlay(True)
         else:
-            self.create_overlay(False)
+            self.handle_overlay(False)
 
     def drag_response(self, event) -> None:
-        self.destroy_overlay()
+        self.remove_image_overlay()
 
     def on_drag_leave(self, event) -> None:
-        self.destroy_overlay()
+        self.remove_image_overlay()
         print("left drag n drop area!")
 
     def run(self):
