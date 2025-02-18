@@ -3,6 +3,8 @@ from tkinter import messagebox
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from utils import *
 from PIL import Image, ImageTk
+from ocrext import *
+from ocrext.ocrext.ocr import extract_text
 #import debugpy
 
 # debugpy.listen(("localhost", 5678)) #attaching debugger
@@ -39,6 +41,7 @@ class DragDropApp:
         self.overlay_label = None
         self.set_up_frames()
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.valid_file_state = False
 
     def set_up_frames(self):
 
@@ -131,14 +134,30 @@ class DragDropApp:
 
     def on_drag_enter(self, event) -> None:
         file_path = event.data #get file name?
-
-        if check_file_type(file_path):
+        check_file_run = check_file_type(file_path)
+        if check_file_run:
             self.handle_overlay(True)
         else:
             self.handle_overlay(False)
+        self.valid_file_state = check_file_run
 
-    def drag_response(self, event) -> None:
+    def drag_response(self, event):
         self.remove_image_overlay()
+        file_path = event.data.strip("{}")
+
+        if not self.valid_file_state:
+            self.remove_image_overlay()
+            messagebox.showerror("Invalid file type", "Please provide a valid image type! (PNG, JPG, etc)")
+            return
+        
+        try:
+            print(file_path)
+            extracted_text = extract_text(file_path)
+            print(f"{type(extracted_text)}-type extracted_text came out as {extracted_text}")
+            self.rf_lbl.config(text=extracted_text[:300], wraplength=self.right_frame.winfo_width() - 10)
+        except Exception as e:
+            messagebox.showerror("Exception", f"Exception encountered will extracting text from image: \n {e}")
+            self.rf_lbl.config(text="OCR scan failed!", fg="red")
 
     def on_drag_leave(self, event) -> None:
         self.remove_image_overlay()
